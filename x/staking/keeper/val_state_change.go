@@ -82,6 +82,9 @@ func (k Keeper) deleteValidatorInternal(ctx context.Context, validator types.Val
 	}
 
 	store := k.storeService.OpenKVStore(ctx)
+	if err := store.Delete(types.ValidatorIndexIntactKey); err != nil {
+		return err
+	}
 
 	// Delete main validator record
 	if err := store.Delete(types.GetValidatorKey(valAddr)); err != nil {
