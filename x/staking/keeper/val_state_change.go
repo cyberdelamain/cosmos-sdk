@@ -171,7 +171,7 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 		if err != nil {
 			return nil, fmt.Errorf("validator record not found for address: %X", valAddr)
 		}
-		k.Logger(ctx).Info("iterating validator", "validator", validator.String(), "power", validator.Tokens, "status", validator.Status)
+		k.Logger(ctx).Debug("iterating validator", "operator", validator.OperatorAddress, "power", validator.Tokens, "status", validator.Status)
 
 		if validator.Jailed {
 			return nil, errors.New("should never retrieve a jailed validator from the power store")
@@ -180,7 +180,7 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 		// if we get to a zero-power validator (which we don't bond),
 		// there are no more possible bonded validators
 		if validator.PotentialConsensusPower(k.PowerReduction(ctx)) == 0 {
-			k.Logger(ctx).Info("validator has zero power", "reduction", k.PowerReduction(ctx), "power", validator.PotentialConsensusPower(k.PowerReduction(ctx)))
+			k.Logger(ctx).Debug("validator has zero power", "reduction", k.PowerReduction(ctx), "power", validator.PotentialConsensusPower(k.PowerReduction(ctx)))
 			break
 		}
 
