@@ -75,6 +75,11 @@ func (k Keeper) SetValidator(ctx context.Context, validator types.Validator) err
 	if err != nil {
 		return err
 	}
+	if validator.Tokens.IsZero() {
+		if err := store.Delete(types.ZeroPowerSweptKey); err != nil {
+			return err
+		}
+	}
 	return store.Set(types.GetValidatorKey(str), bz)
 }
 
@@ -392,6 +397,9 @@ func (k Keeper) SetLastValidatorPower(ctx context.Context, operator sdk.ValAddre
 // DeleteLastValidatorPower deletes the last validator power.
 func (k Keeper) DeleteLastValidatorPower(ctx context.Context, operator sdk.ValAddress) error {
 	store := k.storeService.OpenKVStore(ctx)
+	if err := store.Delete(types.ZeroPowerSweptKey); err != nil {
+		return err
+	}
 	return store.Delete(types.GetLastValidatorPowerKey(operator))
 }
 

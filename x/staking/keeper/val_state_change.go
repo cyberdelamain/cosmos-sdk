@@ -37,8 +37,18 @@ func (k Keeper) BlockValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpda
 // DeleteZeroPowerValidators deletes validators with zero power that are not in LastValidatorPower.
 // Only deletes validators already processed by ApplyAndReturnValidatorSetUpdates (not in LastValidatorPower),
 // preventing errors from deleting validators that ApplyAndReturnValidatorSetUpdates still needs to fetch.
+//
+// A validator becomes deletable only when its tokens drop to zero (SetValidator) or it leaves
+// LastValidatorPower (DeleteLastValidatorPower); both clear ZeroPowerSweptKey, so a block
+// without either reads one key instead of every validator.
 func (k Keeper) DeleteZeroPowerValidators(ctx context.Context) error {
 	logger := k.Logger(ctx)
+
+	store := k.storeService.OpenKVStore(ctx)
+	if swept, err := store.Has(types.ZeroPowerSweptKey); err != nil || swept {
+		return err
+	}
+	swept := true
 
 	allValidators, err := k.GetAllValidators(ctx)
 	if err != nil {
@@ -65,11 +75,15 @@ func (k Keeper) DeleteZeroPowerValidators(ctx context.Context) error {
 
 			if err := k.deleteValidatorInternal(ctx, validator, valAddr); err != nil {
 				logger.Error("failed to delete validator", "operator", validator.GetOperator(), "error", err)
+				swept = false
 				continue
 			}
 		}
 	}
 
+	if swept {
+		return store.Set(types.ZeroPowerSweptKey, []byte{1})
+	}
 	return nil
 }
 
