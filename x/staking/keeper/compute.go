@@ -148,6 +148,9 @@ func (k Keeper) SetComputeValidators(
 	for _, operatorAddress := range currentValKeys {
 		val := currentValsByOperatorAddress[operatorAddress]
 		if _, exists := resultsByOperatorAddress[operatorAddress]; !exists {
+			if marked, err := k.isMarkedForDeletion(ctx, val); err == nil && marked {
+				continue
+			}
 			logger.Info("marking validator for removal (not in compute results)", "operator", val.OperatorAddress, "status", val.Status, "jailed", val.Jailed)
 			if err := k.markValidatorForDeletion(ctx, val); err != nil {
 				logger.Error("failed to mark validator for deletion", "operator", val.OperatorAddress, "error", err)
@@ -541,6 +544,26 @@ func (k Keeper) updateValidator(ctx context.Context, validator types.Validator, 
 	}
 
 	return nil
+}
+
+// isMarkedForDeletion reports whether markValidatorForDeletion would only rewrite the bytes
+// validator already has: a non-jailed validator with zero tokens, shares and unbonding ids,
+// a zero-power index entry and no self-delegation shares.
+func (k Keeper) isMarkedForDeletion(ctx context.Context, validator types.Validator) (bool, error) {
+	if validator.Jailed || !validator.Tokens.IsZero() || !validator.DelegatorShares.IsZero() || len(validator.UnbondingIds) > 0 {
+		return false, nil
+	}
+	valAddr, err := k.ValidatorAddressCodec().StringToBytes(validator.OperatorAddress)
+	if err != nil {
+		return false, err
+	}
+	store := k.storeService.OpenKVStore(ctx)
+	indexed, err := store.Has(types.GetValidatorsByPowerIndexKey(validator, k.PowerReduction(ctx), k.validatorAddressCodec))
+	if err != nil || !indexed {
+		return false, err
+	}
+	delegation, err := k.GetDelegation(ctx, sdk.AccAddress(valAddr), valAddr)
+	return err != nil || delegation.Shares.IsZero(), nil
 }
 
 // markValidatorForDeletion sets validator power to zero for immediate deletion.
