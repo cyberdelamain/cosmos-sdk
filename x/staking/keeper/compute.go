@@ -97,23 +97,41 @@ func (k Keeper) SetComputeValidatorsBeforeValidatorIndexFixHeight(ctx context.Co
 }
 
 // SetComputeValidators is the main entry point for updating the validator set.
-// It synchronizes the state with the provided list of compute results.
+// It synchronizes the state with the provided list of compute results and
+// returns the resulting validator set.
 func (k Keeper) SetComputeValidators(
 	ctx context.Context,
 	computeResults []ComputeResult,
 	isTestnet bool,
 ) ([]types.Validator, error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	currentHeight := sdkCtx.BlockHeight()
-	if currentHeight < ValidatorIndexFixHeight && !isTestnet {
+	if sdkCtx.BlockHeight() < ValidatorIndexFixHeight && !isTestnet {
 		return k.SetComputeValidatorsBeforeValidatorIndexFixHeight(ctx, computeResults)
+	}
+	if err := k.ApplyComputeValidators(ctx, computeResults, isTestnet); err != nil {
+		return nil, err
+	}
+	return k.GetAllValidators(ctx)
+}
+
+// ApplyComputeValidators is SetComputeValidators without re-reading the whole
+// validator set afterwards, for callers that discard it.
+func (k Keeper) ApplyComputeValidators(
+	ctx context.Context,
+	computeResults []ComputeResult,
+	isTestnet bool,
+) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	if sdkCtx.BlockHeight() < ValidatorIndexFixHeight && !isTestnet {
+		_, err := k.SetComputeValidatorsBeforeValidatorIndexFixHeight(ctx, computeResults)
+		return err
 	}
 	logger := k.Logger(sdkCtx)
 
 	currentValidators, err := k.GetAllValidators(ctx)
 	if err != nil {
 		logger.Error("failed to get all validators", "error", err)
-		return nil, err
+		return err
 	}
 
 	currentValsByConsensusAddress := make(map[string]types.Validator)
@@ -189,7 +207,7 @@ func (k Keeper) SetComputeValidators(
 		}
 	}
 
-	return k.GetAllValidators(ctx)
+	return nil
 }
 
 func sortAndFilterComputeResult(
