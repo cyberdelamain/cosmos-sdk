@@ -36,6 +36,6 @@ func (k Keeper) BeginBlocker(ctx sdk.Context) error {
 	}
 
 	// Gonka: AllocateTokens pays nothing, so the previous proposer is not
-	// recorded; writing it would rewrite this store every block.
+	// recorded; ExportGenesis reads it from staking historical info.
 	return nil
 }
